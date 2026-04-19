@@ -557,3 +557,13 @@ flex-direction:column;
 grid-template-columns:1fr;
 }
 }
+.site-footer{
+position:relative;
+z-index:1;
+text-align:center;
+padding:28px 16px 10px;
+color:var(--muted);
+font-size:14px;
+border-top:1px solid rgba(255,255,255,.06);
+margin-top:30px;
+}
