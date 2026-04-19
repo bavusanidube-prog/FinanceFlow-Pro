@@ -34,6 +34,11 @@ const el = {
 };
 
 const STORAGE_KEY = "financeflowpro_transactions";
+
+const incomeCategories = ["Salary", "Freelance", "Other"];
+const expenseCategories = ["Food", "Transport", "Shopping", "Rent", "Bills", "Health", "Entertainment", "Other"];
+const allCategories = [...new Set([...incomeCategories, ...expenseCategories])];
+
 let transactions = loadTransactions();
 
 function money(value) {
@@ -73,6 +78,13 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function fillCategoryOptions(typeValue = "income") {
+  const categories = typeValue === "income" ? incomeCategories : expenseCategories;
+  el.category.innerHTML = categories
+    .map((item) => `<option value="${item}">${item}</option>`)
+    .join("");
+}
+
 function validateForm() {
   const title = el.title.value.trim();
   const type = el.type.value;
@@ -85,6 +97,14 @@ function validateForm() {
   if (!amount || amount <= 0) throw new Error("Enter a valid amount greater than 0.");
   if (!category) throw new Error("Choose a category.");
   if (!date) throw new Error("Choose a date.");
+
+  if (type === "income" && !incomeCategories.includes(category)) {
+    throw new Error("Choose a valid income category.");
+  }
+
+  if (type === "expense" && !expenseCategories.includes(category)) {
+    throw new Error("Choose a valid expense category.");
+  }
 
   return {
     id: crypto.randomUUID(),
@@ -100,6 +120,7 @@ function validateForm() {
 function resetForm() {
   el.title.value = "";
   el.type.value = "income";
+  fillCategoryOptions("income");
   el.amount.value = "";
   el.category.value = "Salary";
   el.date.value = getToday();
@@ -243,6 +264,7 @@ function updateInsights() {
 
   let topCategoryName = "N/A";
   let topCategoryAmount = 0;
+
   Object.entries(categoryTotals).forEach(([category, total]) => {
     if (total > topCategoryAmount) {
       topCategoryAmount = total;
@@ -252,7 +274,7 @@ function updateInsights() {
 
   el.monthIncome.textContent = money(monthIncome);
   el.monthExpenses.textContent = money(monthExpenses);
-  el.topCategory.textContent = topCategoryName === "N/A" ? "N/A" : `${topCategoryName}`;
+  el.topCategory.textContent = topCategoryName;
   el.biggestExpense.textContent = biggestExpenseItem.amount ? money(biggestExpenseItem.amount) : "£0.00";
 
   renderCategoryBreakdown(categoryTotals);
@@ -365,6 +387,19 @@ function clearAllTransactions() {
   setMessage("All transactions cleared.", "success");
 }
 
+function refreshFilterCategories() {
+  const current = el.filterCategory.value;
+  el.filterCategory.innerHTML = `
+    <option value="all">All Categories</option>
+    ${allCategories.map((item) => `<option value="${item}">${item}</option>`).join("")}
+  `;
+  if (allCategories.includes(current)) {
+    el.filterCategory.value = current;
+  } else {
+    el.filterCategory.value = "all";
+  }
+}
+
 el.addTransactionBtn.onclick = addTransaction;
 el.exportBtn.onclick = exportCSV;
 el.clearBtn.onclick = clearAllTransactions;
@@ -373,5 +408,12 @@ el.searchInput.oninput = updateUI;
 el.filterType.onchange = updateUI;
 el.filterCategory.onchange = updateUI;
 
+el.type.onchange = () => {
+  const currentType = el.type.value;
+  fillCategoryOptions(currentType);
+};
+
+fillCategoryOptions("income");
+refreshFilterCategories();
 el.date.value = getToday();
 updateUI();
