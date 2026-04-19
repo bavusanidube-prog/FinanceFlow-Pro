@@ -20,6 +20,13 @@ const el = {
   expenseCard: document.getElementById("expenseCard"),
   transactionCount: document.getElementById("transactionCount"),
 
+  monthIncome: document.getElementById("monthIncome"),
+  monthExpenses: document.getElementById("monthExpenses"),
+  topCategory: document.getElementById("topCategory"),
+  biggestExpense: document.getElementById("biggestExpense"),
+  categoryBreakdown: document.getElementById("categoryBreakdown"),
+  monthlySnapshot: document.getElementById("monthlySnapshot"),
+
   searchInput: document.getElementById("searchInput"),
   filterType: document.getElementById("filterType"),
   filterCategory: document.getElementById("filterCategory"),
@@ -27,7 +34,6 @@ const el = {
 };
 
 const STORAGE_KEY = "financeflowpro_transactions";
-
 let transactions = loadTransactions();
 
 function money(value) {
@@ -74,25 +80,11 @@ function validateForm() {
   const category = el.category.value;
   const date = el.date.value;
 
-  if (!title) {
-    throw new Error("Transaction title is required.");
-  }
-
-  if (!type || !["income", "expense"].includes(type)) {
-    throw new Error("Choose a valid transaction type.");
-  }
-
-  if (!amount || amount <= 0) {
-    throw new Error("Enter a valid amount greater than 0.");
-  }
-
-  if (!category) {
-    throw new Error("Choose a category.");
-  }
-
-  if (!date) {
-    throw new Error("Choose a date.");
-  }
+  if (!title) throw new Error("Transaction title is required.");
+  if (!["income", "expense"].includes(type)) throw new Error("Choose a valid transaction type.");
+  if (!amount || amount <= 0) throw new Error("Enter a valid amount greater than 0.");
+  if (!category) throw new Error("Choose a category.");
+  if (!date) throw new Error("Choose a date.");
 
   return {
     id: crypto.randomUUID(),
@@ -143,11 +135,8 @@ function getFilteredTransactions() {
       item.category.toLowerCase().includes(query) ||
       item.date.toLowerCase().includes(query);
 
-    const matchesType =
-      typeFilter === "all" ? true : item.type === typeFilter;
-
-    const matchesCategory =
-      categoryFilter === "all" ? true : item.category === categoryFilter;
+    const matchesType = typeFilter === "all" ? true : item.type === typeFilter;
+    const matchesCategory = categoryFilter === "all" ? true : item.category === categoryFilter;
 
     return matchesQuery && matchesType && matchesCategory;
   });
@@ -218,8 +207,109 @@ function updateTotals() {
   el.transactionCount.textContent = String(transactions.length);
 }
 
+function getCurrentMonthTransactions() {
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+
+  return transactions.filter((item) => {
+    const d = new Date(item.date);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+}
+
+function updateInsights() {
+  const currentMonth = getCurrentMonthTransactions();
+
+  const monthIncome = currentMonth
+    .filter((item) => item.type === "income")
+    .reduce((sum, item) => sum + Number(item.amount), 0);
+
+  const monthExpenses = currentMonth
+    .filter((item) => item.type === "expense")
+    .reduce((sum, item) => sum + Number(item.amount), 0);
+
+  const expensesOnly = transactions.filter((item) => item.type === "expense");
+
+  const biggestExpenseItem = expensesOnly.reduce(
+    (max, item) => (Number(item.amount) > Number(max.amount || 0) ? item : max),
+    {}
+  );
+
+  const categoryTotals = {};
+  expensesOnly.forEach((item) => {
+    categoryTotals[item.category] = (categoryTotals[item.category] || 0) + Number(item.amount);
+  });
+
+  let topCategoryName = "N/A";
+  let topCategoryAmount = 0;
+  Object.entries(categoryTotals).forEach(([category, total]) => {
+    if (total > topCategoryAmount) {
+      topCategoryAmount = total;
+      topCategoryName = category;
+    }
+  });
+
+  el.monthIncome.textContent = money(monthIncome);
+  el.monthExpenses.textContent = money(monthExpenses);
+  el.topCategory.textContent = topCategoryName === "N/A" ? "N/A" : `${topCategoryName}`;
+  el.biggestExpense.textContent = biggestExpenseItem.amount ? money(biggestExpenseItem.amount) : "£0.00";
+
+  renderCategoryBreakdown(categoryTotals);
+  renderMonthlySnapshot(currentMonth, monthIncome, monthExpenses);
+}
+
+function renderCategoryBreakdown(categoryTotals) {
+  el.categoryBreakdown.innerHTML = "";
+
+  const entries = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]);
+
+  if (!entries.length) {
+    el.categoryBreakdown.innerHTML = `
+      <div class="empty-state">No category expense data yet.</div>
+    `;
+    return;
+  }
+
+  entries.forEach(([category, total]) => {
+    const row = document.createElement("div");
+    row.className = "breakdown-item";
+    row.innerHTML = `
+      <div class="breakdown-label">${escapeHtml(category)}</div>
+      <div class="breakdown-value">${money(total)}</div>
+    `;
+    el.categoryBreakdown.appendChild(row);
+  });
+}
+
+function renderMonthlySnapshot(currentMonth, monthIncome, monthExpenses) {
+  el.monthlySnapshot.innerHTML = "";
+
+  const balance = monthIncome - monthExpenses;
+  const savingsRate = monthIncome > 0 ? Math.round((balance / monthIncome) * 100) : 0;
+
+  const items = [
+    ["Transactions This Month", currentMonth.length],
+    ["Monthly Income", money(monthIncome)],
+    ["Monthly Expenses", money(monthExpenses)],
+    ["Monthly Balance", money(balance)],
+    ["Monthly Savings Rate", `${savingsRate}%`]
+  ];
+
+  items.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "breakdown-item";
+    row.innerHTML = `
+      <div class="breakdown-label">${escapeHtml(label)}</div>
+      <div class="breakdown-value">${escapeHtml(value)}</div>
+    `;
+    el.monthlySnapshot.appendChild(row);
+  });
+}
+
 function updateUI() {
   updateTotals();
+  updateInsights();
   renderTransactions();
 }
 
@@ -242,9 +332,7 @@ function exportCSV() {
   const csvContent = [
     headers.join(","),
     ...rows.map((row) =>
-      row
-        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
-        .join(",")
+      row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")
     )
   ].join("\n");
 

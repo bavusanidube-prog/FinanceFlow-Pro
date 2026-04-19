@@ -72,7 +72,7 @@
         </div>
 
         <input id="title" placeholder="Transaction Title" />
-        
+
         <select id="type">
           <option value="income">Income</option>
           <option value="expense">Expense</option>
@@ -127,6 +127,49 @@
           <div class="stat-card">
             <h3>Transactions</h3>
             <p id="transactionCount">0</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="section-head">
+          <div>
+            <span class="section-kicker">Analytics</span>
+            <h2>Finance Insights</h2>
+          </div>
+        </div>
+
+        <div class="insights-grid">
+          <div class="insight-card">
+            <h3>This Month Income</h3>
+            <p id="monthIncome">£0.00</p>
+          </div>
+
+          <div class="insight-card">
+            <h3>This Month Expenses</h3>
+            <p id="monthExpenses">£0.00</p>
+          </div>
+
+          <div class="insight-card">
+            <h3>Top Spending Category</h3>
+            <p id="topCategory">N/A</p>
+          </div>
+
+          <div class="insight-card">
+            <h3>Biggest Expense</h3>
+            <p id="biggestExpense">£0.00</p>
+          </div>
+        </div>
+
+        <div class="analytics-layout">
+          <div class="analytics-card">
+            <h3>Category Breakdown</h3>
+            <div id="categoryBreakdown" class="breakdown-list"></div>
+          </div>
+
+          <div class="analytics-card">
+            <h3>Monthly Snapshot</h3>
+            <div id="monthlySnapshot" class="breakdown-list"></div>
           </div>
         </div>
       </section>
