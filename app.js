@@ -7,6 +7,10 @@ const el = {
   addTransactionBtn: document.getElementById("addTransactionBtn"),
   formMessage: document.getElementById("formMessage"),
 
+  quickInput: document.getElementById("quickInput"),
+  parseQuickBtn: document.getElementById("parseQuickBtn"),
+  quickMessage: document.getElementById("quickMessage"),
+
   exportBtn: document.getElementById("exportBtn"),
   clearBtn: document.getElementById("clearBtn"),
 
@@ -45,10 +49,19 @@ function money(value) {
   return `£${Number(value || 0).toFixed(2)}`;
 }
 
-function setMessage(text = "", type = "") {
-  el.formMessage.className = "message";
-  if (type) el.formMessage.classList.add(type);
-  el.formMessage.textContent = text;
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function setMessage(target, text = "", type = "") {
+  target.className = "message";
+  if (type) target.classList.add(type);
+  target.textContent = text;
 }
 
 function saveTransactions() {
@@ -69,15 +82,6 @@ function getToday() {
   return new Date().toISOString().split("T")[0];
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 function fillCategoryOptions(typeValue = "income") {
   const categories = typeValue === "income" ? incomeCategories : expenseCategories;
   el.category.innerHTML = categories
@@ -85,36 +89,53 @@ function fillCategoryOptions(typeValue = "income") {
     .join("");
 }
 
-function validateForm() {
-  const title = el.title.value.trim();
-  const type = el.type.value;
-  const amount = Number(el.amount.value);
-  const category = el.category.value;
-  const date = el.date.value;
+function refreshFilterCategories() {
+  const current = el.filterCategory.value;
+  el.filterCategory.innerHTML = `
+    <option value="all">All Categories</option>
+    ${allCategories.map((item) => `<option value="${item}">${item}</option>`).join("")}
+  `;
+  if (allCategories.includes(current)) {
+    el.filterCategory.value = current;
+  } else {
+    el.filterCategory.value = "all";
+  }
+}
 
+function buildTransaction({ title, type, amount, category, date }) {
   if (!title) throw new Error("Transaction title is required.");
   if (!["income", "expense"].includes(type)) throw new Error("Choose a valid transaction type.");
-  if (!amount || amount <= 0) throw new Error("Enter a valid amount greater than 0.");
+  if (!amount || Number(amount) <= 0) throw new Error("Enter a valid amount greater than 0.");
   if (!category) throw new Error("Choose a category.");
   if (!date) throw new Error("Choose a date.");
 
   if (type === "income" && !incomeCategories.includes(category)) {
-    throw new Error("Choose a valid income category.");
+    throw new Error(`"${category}" is not a valid income category.`);
   }
 
   if (type === "expense" && !expenseCategories.includes(category)) {
-    throw new Error("Choose a valid expense category.");
+    throw new Error(`"${category}" is not a valid expense category.`);
   }
 
   return {
     id: crypto.randomUUID(),
-    title,
+    title: title.trim(),
     type,
-    amount,
+    amount: Number(amount),
     category,
     date,
     createdAt: new Date().toISOString()
   };
+}
+
+function validateForm() {
+  return buildTransaction({
+    title: el.title.value.trim(),
+    type: el.type.value,
+    amount: el.amount.value,
+    category: el.category.value,
+    date: el.date.value
+  });
 }
 
 function resetForm() {
@@ -133,10 +154,75 @@ function addTransaction() {
     saveTransactions();
     resetForm();
     updateUI();
-    setMessage("Transaction added successfully.", "success");
+    setMessage(el.formMessage, "Transaction added successfully.", "success");
   } catch (error) {
-    setMessage(error.message || "Unable to add transaction.", "error");
+    setMessage(el.formMessage, error.message || "Unable to add transaction.", "error");
   }
+}
+
+function addQuickTransactions() {
+  const raw = el.quickInput.value.trim();
+
+  if (!raw) {
+    setMessage(el.quickMessage, "Paste at least one transaction line first.", "error");
+    return;
+  }
+
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const created = [];
+  const errors = [];
+
+  lines.forEach((line, index) => {
+    const parts = line.split(",").map((part) => part.trim());
+
+    if (parts.length !== 5) {
+      errors.push(`Line ${index + 1}: use Title, type, amount, category, date`);
+      return;
+    }
+
+    const [title, typeRaw, amountRaw, category, date] = parts;
+    const type = typeRaw.toLowerCase();
+
+    try {
+      const transaction = buildTransaction({
+        title,
+        type,
+        amount: amountRaw,
+        category,
+        date
+      });
+      created.push(transaction);
+    } catch (error) {
+      errors.push(`Line ${index + 1}: ${error.message}`);
+    }
+  });
+
+  if (created.length) {
+    transactions = [...created.reverse(), ...transactions];
+    saveTransactions();
+    updateUI();
+    el.quickInput.value = "";
+  }
+
+  if (created.length && !errors.length) {
+    setMessage(el.quickMessage, `${created.length} transactions added successfully.`, "success");
+    return;
+  }
+
+  if (created.length && errors.length) {
+    setMessage(
+      el.quickMessage,
+      `${created.length} added, but some lines failed: ${errors.join(" | ")}`,
+      "error"
+    );
+    return;
+  }
+
+  setMessage(el.quickMessage, errors.join(" | "), "error");
 }
 
 function deleteTransaction(id) {
@@ -337,7 +423,7 @@ function updateUI() {
 
 function exportCSV() {
   if (!transactions.length) {
-    setMessage("No transactions to export.", "error");
+    setMessage(el.formMessage, "No transactions to export.", "error");
     return;
   }
 
@@ -369,12 +455,12 @@ function exportCSV() {
   document.body.removeChild(link);
 
   URL.revokeObjectURL(url);
-  setMessage("CSV exported successfully.", "success");
+  setMessage(el.formMessage, "CSV exported successfully.", "success");
 }
 
 function clearAllTransactions() {
   if (!transactions.length) {
-    setMessage("There are no transactions to clear.", "error");
+    setMessage(el.formMessage, "There are no transactions to clear.", "error");
     return;
   }
 
@@ -384,23 +470,12 @@ function clearAllTransactions() {
   transactions = [];
   saveTransactions();
   updateUI();
-  setMessage("All transactions cleared.", "success");
-}
-
-function refreshFilterCategories() {
-  const current = el.filterCategory.value;
-  el.filterCategory.innerHTML = `
-    <option value="all">All Categories</option>
-    ${allCategories.map((item) => `<option value="${item}">${item}</option>`).join("")}
-  `;
-  if (allCategories.includes(current)) {
-    el.filterCategory.value = current;
-  } else {
-    el.filterCategory.value = "all";
-  }
+  setMessage(el.formMessage, "All transactions cleared.", "success");
+  setMessage(el.quickMessage, "", "");
 }
 
 el.addTransactionBtn.onclick = addTransaction;
+el.parseQuickBtn.onclick = addQuickTransactions;
 el.exportBtn.onclick = exportCSV;
 el.clearBtn.onclick = clearAllTransactions;
 
@@ -409,8 +484,7 @@ el.filterType.onchange = updateUI;
 el.filterCategory.onchange = updateUI;
 
 el.type.onchange = () => {
-  const currentType = el.type.value;
-  fillCategoryOptions(currentType);
+  fillCategoryOptions(el.type.value);
 };
 
 fillCategoryOptions("income");

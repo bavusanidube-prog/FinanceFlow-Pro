@@ -83,13 +83,6 @@
         <select id="category">
           <option value="Salary">Salary</option>
           <option value="Freelance">Freelance</option>
-          <option value="Food">Food</option>
-          <option value="Transport">Transport</option>
-          <option value="Shopping">Shopping</option>
-          <option value="Rent">Rent</option>
-          <option value="Bills">Bills</option>
-          <option value="Health">Health</option>
-          <option value="Entertainment">Entertainment</option>
           <option value="Other">Other</option>
         </select>
 
@@ -101,6 +94,26 @@
       </section>
 
       <section class="panel">
+        <div class="section-head">
+          <div>
+            <span class="section-kicker">Quick Add</span>
+            <h2>Add Multiple Transactions</h2>
+          </div>
+        </div>
+
+        <p class="helper-text">
+          One transaction per line using:
+          <strong>Title, type, amount, category, date</strong>
+        </p>
+
+        <textarea id="quickInput" placeholder="Salary, income, 2000, Salary, 2026-04-19&#10;Rent, expense, 700, Rent, 2026-04-19&#10;Food, expense, 120, Food, 2026-04-19"></textarea>
+
+        <button id="parseQuickBtn" class="secondary-btn">Add All Lines</button>
+
+        <p id="quickMessage" class="message"></p>
+      </section>
+
+      <section class="panel panel-wide">
         <div class="section-head">
           <div>
             <span class="section-kicker">Overview</span>
